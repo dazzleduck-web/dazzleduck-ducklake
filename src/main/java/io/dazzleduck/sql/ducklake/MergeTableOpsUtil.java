@@ -1,5 +1,7 @@
 package io.dazzleduck.sql.ducklake;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -9,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Comparator;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import io.dazzleduck.sql.commons.ConnectionPool;
@@ -18,6 +21,7 @@ import io.dazzleduck.sql.commons.ingestion.CopyResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -199,15 +203,60 @@ public class MergeTableOpsUtil {
                         : commitViaDuckDb(conn, mdDatabase, tableId, tempTableId, toRemove);
 
             } finally {
-                // Always drop temp table, whether Phase 2 committed or rolled back.
+                // Always drop temp table and cleanup temp directory, whether Phase 2 committed or rolled back.
                 if (tempTableName != null) {
                     try {
                         ConnectionPool.execute(conn, "DROP TABLE IF EXISTS %s.%s".formatted(database, tempTableName));
                     } catch (Exception e) {
                         logger.warn("Failed to drop temp table {}.{}: {}", database, tempTableName, e.getMessage());
                     }
+                    // Cleanup temp directory from filesystem
+                    deleteTempDirectory(conn, mdDatabase, tempTableName);
                 }
             }
+        }
+    }
+
+    /**
+     * Deletes temp directory if it exists. Queries full data path from database metadata.
+     * <p>
+     * DuckDB creates directories at: <data_path>/main/<table_name>/
+     * We query the actual data_path from ducklake_metadata to get the full filesystem path.
+     *
+     * @param mdDatabase metadata database name (e.g., "__ducklake_catalog")
+     * @param tempTableName name of the temp table (e.g., "__temp_1_uuid")
+     */
+    private static void deleteTempDirectory(Connection conn, String mdDatabase, String tempTableName) {
+        try {
+            // Get full data path from database metadata
+            String dataPath = ConnectionPool.collectFirst(conn, "SELECT value FROM %s%sducklake_metadata WHERE key = 'data_path'".formatted(mdDatabase, MetadataConfig.q()), String.class);
+
+            if (dataPath == null || dataPath.isBlank()) {
+                logger.debug("No data_path found, skipping temp directory cleanup");
+                return;
+            }
+            // Get schema path (usually "main" for default schema)
+            String schemaPath = ConnectionPool.collectFirst(conn, "SELECT path FROM %s%sducklake_schema".formatted(mdDatabase, MetadataConfig.q()), String.class);
+
+            if (schemaPath == null || schemaPath.isBlank()) {
+                schemaPath = "main"; // Default schema name
+            }
+
+            // Construct temp directory path: <data_path>/<schema>/<temp_table>/
+            Path tempDir = Paths.get(dataPath, schemaPath, tempTableName);
+
+            if (Files.exists(tempDir)) {
+                // Delete files first, then directories (reverse order)
+                Files.walk(tempDir).sorted(Comparator.reverseOrder()).forEach(path -> {
+                            try {
+                                Files.delete(path);
+                            } catch (IOException e) {
+                                logger.warn("Failed to delete temp file/directory: {}", path);
+                            }
+                        });
+            }
+        } catch (IOException e) {
+            logger.debug("Failed to query data_path for temp directory cleanup: {}", e.getMessage());
         }
     }
 
