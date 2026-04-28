@@ -1,0 +1,33 @@
+# Auto-detect text files and normalize line endings to LF in the repo
+* text=auto eol=lf
+
+# Source code
+*.java     text diff=java
+*.xml      text
+*.properties text
+*.md       text
+*.yml      text
+*.yaml     text
+*.json     text
+*.sql      text
+
+# Shell scripts must keep LF endings
+*.sh       text eol=lf
+mvnw       text eol=lf
+
+# Windows batch files: leave alone, no normalization (preserve existing CRLF)
+*.cmd      -text
+*.bat      -text
+
+# Binary files
+*.jar      binary
+*.war      binary
+*.ear      binary
+*.class    binary
+*.png      binary
+*.jpg      binary
+*.jpeg     binary
+*.gif      binary
+*.ico      binary
+*.pdf      binary
+*.parquet  binary

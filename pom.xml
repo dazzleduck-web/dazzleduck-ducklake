@@ -3,7 +3,7 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>io.dazzleduckl.sql</groupId>
+    <groupId>io.dazzleduck.sql</groupId>
     <artifactId>ducklake</artifactId>
     <version>0.0.17</version>
     <name>Dazzle Ducklake</name>
@@ -16,7 +16,7 @@
         <testcontainers.version>1.21.4</testcontainers.version>
         <aws-sdk.version>2.20.160</aws-sdk.version>
         <jackson.version>2.15.3</jackson.version>
-        <dazzleduck.version>0.0.26</dazzleduck.version>
+        <dazzleduck.version>0.2.0</dazzleduck.version>
     </properties>
 
     <dependencyManagement>
